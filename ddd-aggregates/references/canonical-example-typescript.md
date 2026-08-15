@@ -155,37 +155,42 @@ export class OrderFulfilledEvent implements DomainEvent {
 The aggregate has no idea this schema exists. Sketch only — full coverage in
 `ddd-repositories`:
 
-```typescript
-// orders/infrastructure/schema.ts
-import { integer, numeric, pgTable, text, uuid } from "drizzle-orm/pg-core";
+```prisma
+// prisma/schema.prisma — the conventional location; `prisma generate` makes the client
+model Order {
+  id            String  @id @db.Uuid
+  version       Int                             // the lock column (Rule 10)
+  customerId    String  @db.Uuid @map("customer_id")
+  status        String
+  totalAmount   Decimal @map("total_amount")    // Money split into columns — repository's call
+  totalCurrency String  @map("total_currency")
 
-export const ordersTable = pgTable("orders", {
-  id: uuid("id").primaryKey(),
-  version: integer("version").notNull(),        // the lock column (Rule 10)
-  customerId: uuid("customer_id").notNull(),
-  status: text("status").notNull(),
-  totalAmount: numeric("total_amount").notNull(), // Money split into columns — repository's call
-  totalCurrency: text("total_currency").notNull(),
-});
-
-export function toDomain(row: typeof ordersTable.$inferSelect, lines: OrderLine[]): Order {
-  return Order.rehydrate(row.id, new CustomerId(row.customerId), lines,
-    row.status as OrderStatus,
-    new Money(row.totalAmount, row.totalCurrency), row.version);
+  @@map("orders")
 }
 ```
 
-**Optimistic locking mechanics:** Drizzle has no built-in version column, so the
-repository implementation does the check explicitly — update with
-`WHERE id = ? AND version = loadedVersion`, setting `version = loadedVersion + 1`,
-and if the affected row count is 0, throw a domain-neutral
+```typescript
+// orders/infrastructure/order-mapping.ts — the generated row type IS the mirror
+import type { Order as OrderRow } from "@prisma/client";
+
+export function toDomain(row: OrderRow, lines: OrderLine[]): Order {
+  return Order.rehydrate(row.id, new CustomerId(row.customerId), lines,
+    row.status as OrderStatus,
+    new Money(Number(row.totalAmount), row.totalCurrency), row.version);
+}
+```
+
+**Optimistic locking mechanics:** Prisma has no built-in version annotation, so
+the repository implementation does the compare-and-set explicitly —
+`updateMany({ where: { id, version: loadedVersion }, data: { ...fields, version: { increment: 1 } } })`
+— and if the returned `count` is 0, throws a domain-neutral
 `ConcurrencyConflictError`; the api layer's error-mapping middleware turns it
 into **409 Conflict**.
 
 ## What this demonstrates
 
 - **Plain object (Rule 1):** imports only the BC's own domain types — no
-  `drizzle-orm`, `pg`, or `express`.
+  `@prisma/client`, `pg`, or `express`.
 - **No setters, no public mutable fields (Rules 2, 3):** state is `private`
   (with `readonly` where immutable); read access via getters; only domain
   methods mutate.
@@ -197,8 +202,9 @@ into **409 Conflict**.
 - **Typed identity (Rule 9):** `OrderId`/`CustomerId` classes at the API surface
   (nominal typing — a structural `{ value: string }` alias would let the two IDs
   swap silently); raw UUID string internally.
-- **Plain `number` version (Rule 10):** the schema carries the `version` column
-  and the repository does the compare-and-set; the aggregate carries `_version`.
+- **Plain `number` version (Rule 10):** the Prisma model carries the `version`
+  column and the repository does the compare-and-set; the aggregate carries
+  `_version`.
 - **Value object as plain field (Rule 11):** `_total: Money`, no schema coupling.
 - **Events (Rule 12):** `*Event` suffix, past tense, raised inside, drained via
   `pullPendingEvents()`, published after commit.
@@ -212,5 +218,6 @@ into **409 Conflict**.
   makes them interchangeable and defeats Rule 9.
 - Invariant unit tests are pure Node: no database, no Express app —
   `Order.place(...)` and `order.cancel()` are directly testable.
-- Domain purity: no `drizzle-orm`, `pg`, `prisma`, or `express` imports under
-  `orders/domain/` — enforced by the ts-arch rules from `ddd-foundations`.
+- Domain purity: no `@prisma/client`, `pg`, or `express` imports under
+  `orders/domain/` — enforced by the ts-arch rules from `ddd-foundations`
+  (the generated client is confined to `infrastructure/` by the same rules).

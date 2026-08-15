@@ -79,8 +79,8 @@ export class ProcessRefundApplicationService {
     private readonly orders: OrderRepository,                           // domain interface (Rule 3)
     private readonly calculator: RefundCalculatorDomainService,
     private readonly events: EventPublisher,                            // from shared/events
-    private readonly clock: () => Date,                                 // injected so tests can fix time
     private readonly tx: Transaction,                                   // owns the boundary (Rule 8)
+    private readonly clock: () => Date = () => new Date(),              // default; tests pass () => fixed
   ) {}
 
   async refund(orderId: OrderId): Promise<RefundDTO> {
@@ -118,21 +118,26 @@ The three classes have different dependency signatures, and the directory each
 lives in enforces them (per `ddd-foundations` and the ts-arch rules). The
 aggregate depends on nothing beyond domain types. The domain service has no
 I/O dependencies. The application service is where framework concerns
-aggregate. If you find yourself importing the Drizzle db or a repository
+aggregate. If you find yourself importing `PrismaClient` or a repository
 implementation into a file under `orders/domain/`, you've discovered the class
 is actually an application service — move and rename it.
 
 ## TypeScript idioms
 
-- The composition root is `boot/`: build `RefundPolicy` from configuration
-  there, construct `new RefundCalculatorDomainService(policy)` once, and pass
-  it into the application service's constructor — the domain service never
-  reads `process.env` itself.
+- The composition root is `createApp()` in `app.ts`: build `RefundPolicy` from
+  parsed config there, construct `new RefundCalculatorDomainService(policy)`
+  once as an app-lifetime object, and pass it into the application service's
+  constructor — the domain service never reads `process.env` itself. No DI
+  framework anywhere; `server.ts` imports the app and listens.
 - Don't flatten the domain service into exported module functions (Rule 9):
   the instance carries configured policy and can be substituted in tests;
-  bare exports can't without module-mocking machinery.
-- `clock` as `() => Date` (`() => new Date()` in boot, `() => fixed` in tests)
-  is the lightweight TS spelling of an injected time source.
+  bare exports can't without module-mocking machinery. A small class is
+  ordinary TypeScript, not framework ceremony.
+- `clock` as `() => Date` **with a default parameter value**
+  (`clock: () => Date = () => new Date()` in the constructor; `() => fixed` in
+  tests) is the native TS spelling of a controllable time source — a default
+  argument, not a framework. Default parameters go last, so `clock` sits after
+  `tx` in the constructor.
 - Express routers stay in `api/` (per `ddd-foundations`); the application
   service receives everything through its constructor — no `req`/`res` types
   below the api layer.

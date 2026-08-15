@@ -25,8 +25,7 @@ payments/
 │   ├── payment-dto.ts                 (output DTO)
 │   └── authorize-payment-application-service.ts
 ├── infrastructure/
-│   ├── schema.ts                  (Drizzle table definitions — ORM lives here)
-│   └── postgres-payment-repository.ts  (implements the domain interface, translates)
+│   └── prisma-payment-repository.ts   (implements the domain interface; maps Prisma rows ↔ domain)
 └── api/
     ├── payments-router.ts         (Express router)
     └── error-handlers.ts          (error-mapping middleware)
@@ -56,40 +55,44 @@ export interface PaymentRepository {
 }
 ```
 
-No Drizzle, no `pg`, no Express types. Its vocabulary is the aggregate's
+No Prisma, no `pg`, no Express types. Its vocabulary is the aggregate's
 vocabulary.
 
 ### 2. Repository implementation — `infrastructure`, brings the framework
 
 ```typescript
-// payments/infrastructure/postgres-payment-repository.ts
-import { eq } from "drizzle-orm";
-import type { Db } from "../../shared/db";
+// payments/infrastructure/prisma-payment-repository.ts
+import { PrismaClient } from "@prisma/client";  // generated client — imported ONLY under infrastructure/
 import { Payment, PaymentId } from "../domain/payment";
 import { PaymentRepository } from "../domain/payment-repository";
-import { paymentsTable, toDomain, fromDomain } from "./schema";
+import { toDomain, toRow } from "./payment-mapping";
 
-export class PostgresPaymentRepository implements PaymentRepository {
-  constructor(private readonly db: Db) {}
+export class PrismaPaymentRepository implements PaymentRepository {
+  constructor(private readonly prisma: PrismaClient) {}
 
   async findById(id: PaymentId): Promise<Payment | null> {
-    const rows = await this.db.select().from(paymentsTable)
-      .where(eq(paymentsTable.id, id.value));
-    return rows[0] ? toDomain(rows[0]) : null;      // persistence -> domain
+    const row = await this.prisma.payment.findUnique({ where: { id: id.value } });
+    return row ? toDomain(row) : null;             // persistence -> domain
   }
 
   async persist(payment: Payment): Promise<void> {
-    await this.db.insert(paymentsTable).values(fromDomain(payment))
-      .onConflictDoUpdate({ target: paymentsTable.id, set: fromDomain(payment) });
+    const data = toRow(payment);                   // domain -> persistence
+    await this.prisma.payment.upsert({
+      where: { id: data.id },
+      create: data,
+      update: data,
+    });
   }
 
   // findByOrderId elided — same pattern
 }
 ```
 
-The Drizzle table definition and the row↔domain translation (`toDomain` /
-`fromDomain`) live in `infrastructure/schema.ts`, keeping ORM concerns out of
-`domain`.
+The table definition lives in the conventional `/prisma/schema.prisma`; `prisma
+generate` produces the client and its plain row types, which serve as the
+persistence mirror — nothing to hand-write. The row↔domain mapping (`toDomain`
+/ `toRow`) lives beside the repository in `infrastructure/`, keeping ORM
+concerns out of `domain`.
 
 ### 3. Application service — `application`, orchestrates the use case
 
@@ -147,15 +150,18 @@ export function paymentsRouter(authorizePayment: AuthorizePaymentApplicationServ
 }
 ```
 
-The router receives the application service from the composition root (`boot/`),
-which constructs `PostgresPaymentRepository` and wires everything. The router
-never sees `Payment`, `PaymentRepository`, or `PostgresPaymentRepository`.
+The router factory receives the application service from `createApp()` in
+`app.ts` — the composition root, where the db client, repositories, and
+services are constructed once and handed to the routers (`server.ts` just
+imports the app and listens). The router never sees `Payment`,
+`PaymentRepository`, or `PrismaPaymentRepository`.
 
 ## What this demonstrates
 
 - The repository **interface** lives in `domain`; its signatures use only domain types.
 - The **implementation** lives in `infrastructure` and carries all framework
-  concerns — including the Drizzle schema and the row↔domain translation.
+  concerns — including the generated Prisma client and the row↔domain mapping
+  (the generated row types are the persistence mirror; nothing is hand-written).
 - The application service orchestrates, owns the transaction boundary, depends
   on the domain *interface*, and returns DTOs.
 - The fraud check is a `DomainService`: pure domain logic, no I/O.
@@ -167,12 +173,16 @@ never sees `Payment`, `PaymentRepository`, or `PostgresPaymentRepository`.
 - The repository contract is a TS `interface`; value objects and events are
   classes or `readonly` object types. Aggregates are classes with state
   transitions as methods.
-- The composition root is an explicit wiring module (`boot/`) — or the DI
-  container in NestJS. Application services receive interfaces via constructor
-  parameters; routers are factory functions taking the services they need.
-- Domain purity: no `drizzle-orm`, `pg`, `prisma`, or `express` imports under
-  `payments/domain/`. Table schemas are infrastructure; request/response typing
-  is `api`.
+- The composition root is the app factory Node developers already know:
+  `createApp()` in `app.ts` constructs the db client, repositories, and
+  services once and passes them to router factories; `server.ts` imports the
+  app and listens. No DI framework anywhere — wiring is plain constructor
+  calls, and application services receive interfaces via constructor
+  parameters. (In NestJS its container plays this role; this layout assumes
+  plain Express.)
+- Domain purity: no `@prisma/client`, `pg`, or `express` imports under
+  `payments/domain/`. The generated client and row types are infrastructure;
+  request/response typing (Zod schemas) is `api`.
 - Enforce with **ts-arch** (or dependency-cruiser): rules forbidding
   `payments/domain` from importing other layers, and `payments/application`
   from importing `payments/infrastructure` or `payments/api`.

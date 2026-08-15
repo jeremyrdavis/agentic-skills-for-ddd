@@ -132,19 +132,26 @@ Usage in an aggregate is a plain field — `private _total: Money`,
 ## The persistence mirror (lives in `<bc>/infrastructure`)
 
 The domain classes know nothing about persistence. Sketch only — full mapping
-rules in `ddd-repositories`. Flat columns in the Drizzle schema; the repository
-assembles the value objects:
+rules in `ddd-repositories`. Flat columns in the Prisma model; the repository
+assembles the value objects from the generated row type:
+
+```prisma
+// prisma/schema.prisma — Money stored as flat columns; the repository's call
+model Order {
+  id            String  @id @db.Uuid
+  totalAmount   Decimal @map("total_amount")
+  totalCurrency String  @map("total_currency")
+  customerId    String  @db.Uuid @map("customer_id")
+
+  @@map("orders")
+}
+```
 
 ```typescript
-// orders/infrastructure/schema.ts
-export const ordersTable = pgTable("orders", {
-  id: uuid("id").primaryKey(),
-  totalAmount: numeric("total_amount").notNull(),   // Money split into columns — repository's call
-  totalCurrency: text("total_currency").notNull(),
-  customerId: uuid("customer_id").notNull(),
-});
+// orders/infrastructure/order-mapping.ts
+import type { Order as OrderRow } from "@prisma/client";  // generated row type = the mirror
 
-export function toDomain(row: typeof ordersTable.$inferSelect): Order {
+export function toDomain(row: OrderRow): Order {
   return Order.rehydrate(
     row.id,
     new CustomerId(row.customerId),
@@ -155,8 +162,9 @@ export function toDomain(row: typeof ordersTable.$inferSelect): Order {
 }
 ```
 
-Every schema/ORM concern lives on the mirror in `<bc>/infrastructure` — never
-on the domain class (Rule 6).
+Every schema/ORM concern lives in `/prisma/schema.prisma` and the generated
+client — imported only under `<bc>/infrastructure` — never on the domain class
+(Rule 6).
 
 ## What this demonstrates
 
@@ -171,7 +179,7 @@ on the domain class (Rule 6).
   compare values with `===`/`!==` (except on the wrapped primitives inside
   `equals` itself).
 - **Replacement, not mutation (Rule 5):** `plus`/`times` return new instances.
-- **Plain domain types (Rules 6, 7):** no `drizzle-orm`, `pg`, or `express`
+- **Plain domain types (Rules 6, 7):** no `@prisma/client`, `pg`, or `express`
   imports; no identity field.
 - **Behavior on the value (Rule 8):** `Money.plus`, `EmailAddress.domain()`.
 - **Nominal typed IDs (Rule 9):** the brand member defeats structural typing;
