@@ -65,6 +65,8 @@ fixture, no framework.
 
 ```python
 # orders/application/process_refund_application_service.py
+from datetime import datetime
+
 from orders.application.dtos import RefundDTO
 from orders.domain.errors import OrderNotFoundError
 from orders.domain.order_id import OrderId
@@ -76,8 +78,8 @@ class ProcessRefundApplicationService:
     def __init__(self, orders: OrderRepository,                       # domain interface (Rule 3)
                  calculator: RefundCalculatorDomainService,
                  events,        # the event publisher from shared/events
-                 clock,         # callable returning datetime — injected so tests can fix time
-                 transaction) -> None:                                # owns the boundary (Rule 8)
+                 transaction,                                         # owns the boundary (Rule 8)
+                 clock=datetime.now) -> None:                         # default arg; tests pass a lambda
         self._orders = orders
         self._calculator = calculator
         self._events = events
@@ -122,15 +124,20 @@ service — move and rename it.
 
 ## Python idioms
 
-- The composition root is `boot/`: construct `RefundPolicy` from configuration
-  there, build `RefundCalculatorDomainService(policy)` once, and inject it —
-  the domain service never reads config APIs or environment variables itself.
+- The composition root is `create_app()` in `main.py`: construct `RefundPolicy`
+  from settings there, build `RefundCalculatorDomainService(policy)` once as an
+  app-lifetime object, and pass it along — the domain service never reads
+  config APIs or environment variables itself. Per-request pieces (the
+  `Session`, the repository, the application service) are assembled by plain
+  provider functions in `dependencies.py`. No DI framework anywhere.
 - Don't flatten the domain service into module-level functions (Rule 9): the
   instance carries the configured policy and can be substituted in tests;
-  bare functions can do neither without global state.
-- `clock` as a zero-arg callable (`datetime.now` in boot, a lambda returning a
-  fixed value in tests) is the lightweight Python spelling of an injected time
-  source.
+  bare functions can do neither without global state. A three-line plain class
+  is ordinary Python, not framework ceremony.
+- `clock` as a zero-arg callable **with a default argument**
+  (`clock=datetime.now` in the constructor; a lambda returning a fixed value in
+  tests) is the Pythonic spelling of a controllable time source — a default
+  argument, not a framework.
 - FastAPI's `Depends` stays in `api/` (per `ddd-foundations`); the application
   service receives everything through its constructor.
 - Testing split: domain-service tests are pure Python; application-service
