@@ -59,6 +59,7 @@ Use `--scope local` for a personal, uncommitted install, and `--scope user` only
 
 ```bash
 git clone https://github.com/jeremyrdavis/agentic-skills-for-ddd.git
+mkdir -p <your-project>/.claude/skills
 cp -r agentic-skills-for-ddd/skills/ddd-* <your-project>/.claude/skills/
 ```
 

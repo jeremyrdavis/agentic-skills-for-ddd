@@ -138,15 +138,26 @@ export class OrderLine {
   }
 }
 
-// Events: past tense, *Event suffix (per ddd-foundations)
-export class OrderPlacedEvent implements DomainEvent {
-  constructor(readonly orderId: OrderId, readonly customerId: CustomerId) {}
+// Events: past tense, *Event suffix (per ddd-foundations). Every event carries
+// eventId + occurredAt, assigned once when raised (ddd-domain-events Rule 3).
+export interface DomainEvent {
+  readonly eventId: string;
+  readonly occurredAt: Date;       // when it happened — not an ordering key; order on version if a consumer needs order
 }
-export class OrderCancelledEvent implements DomainEvent {
-  constructor(readonly orderId: OrderId) {}
+
+abstract class BaseDomainEvent implements DomainEvent {
+  readonly eventId = crypto.randomUUID();   // Web Crypto global (Node >= 19)
+  readonly occurredAt = new Date();
 }
-export class OrderFulfilledEvent implements DomainEvent {
-  constructor(readonly orderId: OrderId) {}
+
+export class OrderPlacedEvent extends BaseDomainEvent {
+  constructor(readonly orderId: OrderId, readonly customerId: CustomerId) { super(); }
+}
+export class OrderCancelledEvent extends BaseDomainEvent {
+  constructor(readonly orderId: OrderId) { super(); }
+}
+export class OrderFulfilledEvent extends BaseDomainEvent {
+  constructor(readonly orderId: OrderId) { super(); }
 }
 ```
 
@@ -207,7 +218,7 @@ into **409 Conflict**.
   `_version`.
 - **Value object as plain field (Rule 11):** `_total: Money`, no schema coupling.
 - **Events (Rule 12):** `*Event` suffix, past tense, raised inside, drained via
-  `pullPendingEvents()`, published after commit.
+  `pullPendingEvents()`, published after commit. Each carries its id and time, assigned once at the raising site (`ddd-domain-events` Rule 3).
 
 ## TypeScript idioms
 

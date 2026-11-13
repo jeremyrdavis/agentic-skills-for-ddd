@@ -126,10 +126,28 @@ public record OrderLine(String productSku, int quantity, Money unitPrice) {
     public Money lineTotal() { return unitPrice.times(quantity); }
 }
 
-// Events: past tense, *Event suffix (per ddd-foundations)
-public record OrderPlacedEvent(OrderId orderId, CustomerId customerId) implements DomainEvent {}
-public record OrderCancelledEvent(OrderId orderId)                      implements DomainEvent {}
-public record OrderFulfilledEvent(OrderId orderId)                      implements DomainEvent {}
+// Events: past tense, *Event suffix (per ddd-foundations). Every event carries
+// eventId + occurredAt, assigned once when raised (ddd-domain-events Rule 3);
+// the short constructor keeps the raising sites to the domain facts.
+public interface DomainEvent {
+    UUID eventId();
+    Instant occurredAt();          // when it happened — not an ordering key; order on version if a consumer needs order
+}
+
+public record OrderPlacedEvent(UUID eventId, Instant occurredAt,
+                               OrderId orderId, CustomerId customerId) implements DomainEvent {
+    public OrderPlacedEvent(OrderId orderId, CustomerId customerId) {
+        this(UUID.randomUUID(), Instant.now(), orderId, customerId);
+    }
+}
+
+public record OrderCancelledEvent(UUID eventId, Instant occurredAt, OrderId orderId) implements DomainEvent {
+    public OrderCancelledEvent(OrderId orderId) { this(UUID.randomUUID(), Instant.now(), orderId); }
+}
+
+public record OrderFulfilledEvent(UUID eventId, Instant occurredAt, OrderId orderId) implements DomainEvent {
+    public OrderFulfilledEvent(OrderId orderId) { this(UUID.randomUUID(), Instant.now(), orderId); }
+}
 ```
 
 ## The persistence mirror (lives in `<bc>/infrastructure`)
@@ -180,7 +198,7 @@ api layer's exception mapper turns it into **409 Conflict**.
   carries `private long version`. Same data, different layer.
 - **Value object as plain field (Rule 11):** `Money total`, no `@Embedded`.
 - **Events (Rule 12):** `*Event` suffix, past tense, raised inside, drained by the
-  application service via `pullPendingEvents()`, published after commit.
+  application service via `pullPendingEvents()`, published after commit. Each carries its id and time, assigned once at the raising site (`ddd-domain-events` Rule 3).
 
 ## Java idioms
 

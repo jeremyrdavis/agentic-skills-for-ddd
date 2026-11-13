@@ -124,8 +124,9 @@ Also plain, also persistence-free (full coverage in `ddd-value-objects` and
 
 ```python
 # orders/domain/order_id.py, customer_id.py, order_line.py, events.py
-from dataclasses import dataclass
-from uuid import UUID
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from uuid import UUID, uuid4
 
 
 @dataclass(frozen=True)
@@ -152,7 +153,18 @@ class OrderLine:
         return self.unit_price.times(self.quantity)
 
 
-# Events: past tense, *Event suffix (per ddd-foundations)
+# Events: past tense, *Event suffix (per ddd-foundations). Every event carries
+# event_id + occurred_at, assigned once when raised (ddd-domain-events Rule 3).
+# kw_only keeps the metadata out of the subclasses' positional fields, so the
+# raising sites pass only the domain facts: OrderPlacedEvent(order_id, customer_id).
+@dataclass(frozen=True)
+class DomainEvent:
+    event_id: UUID = field(default_factory=uuid4, kw_only=True)
+    occurred_at: datetime = field(  # when it happened — not an ordering key; order on version if a consumer needs order
+        default_factory=lambda: datetime.now(timezone.utc), kw_only=True
+    )
+
+
 @dataclass(frozen=True)
 class OrderPlacedEvent(DomainEvent):
     order_id: OrderId
@@ -223,7 +235,7 @@ layer's exception handler turns it into **409 Conflict**.
   aggregate carries `_version: int`.
 - **Value object as plain field (Rule 11):** `_total: Money`, no mapping directives.
 - **Events (Rule 12):** `*Event` suffix, past tense, raised inside, drained via
-  `pull_pending_events()`, published after commit.
+  `pull_pending_events()`, published after commit. Each carries its id and time, assigned once at the raising site (`ddd-domain-events` Rule 3).
 
 ## Python idioms
 
