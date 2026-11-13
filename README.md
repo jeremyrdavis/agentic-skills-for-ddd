@@ -20,6 +20,10 @@ Install the DDD skills plus the one stack skill your project uses. Every DDD ski
 
 A stack skill must not redefine any DDD concept. It supplies annotations, framework idioms, configuration, and worked examples that cite the DDD Core Rules by number — nothing else.
 
+### Sibling: the TDD skills
+
+[agentic-skills-for-tdd](https://github.com/jeremyrdavis/agentic-skills-for-tdd) (`tdd-skills`: `tdd-test-list`, `tdd-cycle`) follows the same two-tier model and is built to run alongside these skills. Precedence: `tdd-cycle` governs the sequence of work; the `ddd-*` skills constrain the interface decisions made while writing each test and the layering; implementation decisions in the refactor step are TDD's; `<stack>-ddd` and `<stack>-tdd` supply mechanics. A DDD + TDD Quarkus project installs `ddd-skills`, `tdd-skills`, and `quarkus-skills`.
+
 ## What this repository contains
 
 Six skills under `skills/`:
