@@ -25,7 +25,7 @@ payments/
 │   ├── payment-dto.ts                 (output DTO)
 │   └── authorize-payment-application-service.ts
 ├── infrastructure/
-│   └── prisma-payment-repository.ts   (implements the domain interface; maps Prisma rows ↔ domain)
+│   └── payment-repository.ts          (same name as the interface; maps Prisma rows ↔ domain)
 └── api/
     ├── payments-router.ts         (Express router)
     └── error-handlers.ts          (error-mapping middleware)
@@ -58,16 +58,19 @@ export interface PaymentRepository {
 No Prisma, no `pg`, no Express types. Its vocabulary is the aggregate's
 vocabulary.
 
-### 2. Repository implementation — `infrastructure`, brings the framework
+### 2. Repository implementation — `infrastructure`, brings the framework, same name (`ddd-persistence` Rule 3)
 
 ```typescript
-// payments/infrastructure/prisma-payment-repository.ts
+// payments/infrastructure/payment-repository.ts
 import { PrismaClient } from "@prisma/client";  // generated client — imported ONLY under infrastructure/
 import { Payment, PaymentId } from "../domain/payment";
-import { PaymentRepository } from "../domain/payment-repository";
 import { toDomain, toRow } from "./payment-mapping";
 
-export class PrismaPaymentRepository implements PaymentRepository {
+// Same name as the domain interface — the directory is the distinguisher.
+// TypeScript is structural, so no `implements` (and no import collision) is
+// needed: satisfaction is verified wherever the object meets a parameter
+// typed as the domain interface. No technology name in the class name.
+export class PaymentRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findById(id: PaymentId): Promise<Payment | null> {
@@ -153,8 +156,8 @@ export function paymentsRouter(authorizePayment: AuthorizePaymentApplicationServ
 The router factory receives the application service from `createApp()` in
 `app.ts` — the composition root, where the db client, repositories, and
 services are constructed once and handed to the routers (`server.ts` just
-imports the app and listens). The router never sees `Payment`,
-`PaymentRepository`, or `PrismaPaymentRepository`.
+imports the app and listens). The router never sees `Payment` or
+either `PaymentRepository`.
 
 ## What this demonstrates
 

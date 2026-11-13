@@ -27,7 +27,7 @@ payments/
 │   └── authorize_payment_application_service.py
 ├── infrastructure/
 │   ├── models.py                 (SQLAlchemy-mapped mirror model — ORM lives here)
-│   └── postgres_payment_repository.py  (implements the domain Protocol, translates)
+│   └── payment_repository.py  (implements the domain Protocol, translates)
 └── api/
     ├── router.py                 (FastAPI APIRouter)
     └── error_handlers.py         (exception handlers)
@@ -65,7 +65,7 @@ infrastructure implementation satisfies it structurally — no inheritance neede
 ### 2. Repository implementation — `infrastructure`, brings the framework
 
 ```python
-# payments/infrastructure/postgres_payment_repository.py
+# payments/infrastructure/payment_repository.py
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -74,7 +74,7 @@ from payments.domain.payment import Payment, PaymentId
 from payments.infrastructure.models import PaymentModel
 
 
-class PostgresPaymentRepository:
+class PaymentRepository:
     """Satisfies payments.domain.payment_repository.PaymentRepository."""
 
     def __init__(self, session: Session) -> None:
@@ -149,7 +149,7 @@ def authorize(payment_id: str,
 ```
 
 `get_service` lives in `dependencies.py`, the FastAPI-conventional provider
-module: it builds `PostgresPaymentRepository` around the request's `Session`
+module: it builds `PaymentRepository` around the request's `Session`
 and constructs the application service. App-lifetime objects (engine, settings,
 event bus) are built once in `create_app()` in `main.py` — the composition
 root. FastAPI's `Depends` appears only in `api` — never in `application`.

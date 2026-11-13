@@ -151,8 +151,6 @@ def increment_thumbs_up(self, thought_id: ThoughtId) -> None:
 - `Session` arrives through the constructor from the provider in
   `dependencies.py`; the repository never opens transactions —
   `session.begin()` belongs to the application service (per `ddd-services`).
-- Migrations: Alembic, versioned revisions — mechanics in the per-stack
-  persistence skill.
 - Repository tests split: contract tests run callers against an in-memory
   fake; implementation tests hit a real PostgreSQL (or SQLite where faithful)
   for the mapping, the lock, and the atomic UPDATE.
