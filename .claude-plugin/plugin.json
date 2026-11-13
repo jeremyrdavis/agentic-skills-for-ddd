@@ -1,0 +1,9 @@
+{
+  "name": "ddd-skills",
+  "description": "Stack-neutral Domain-Driven Design skills: layering, aggregates, value objects, services, persistence, domain events. Pair with a <stack>-ddd mechanics skill (e.g. quarkus-ddd).",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "jeremyrdavis"
+  }
+}

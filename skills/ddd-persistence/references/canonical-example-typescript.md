@@ -151,7 +151,6 @@ async incrementThumbsUp(id: ThoughtId): Promise<void> {
 - `PrismaClient` arrives through the constructor from `createApp()` in
   `app.ts`; the repository never opens transactions — the interactive
   transaction belongs to the application service (per `ddd-services`).
-- Migrations: `prisma migrate` — mechanics in the per-stack persistence skill.
 - Repository tests split: contract tests run callers against an in-memory
   fake; implementation tests hit a real PostgreSQL for the mapping, the
   compare-and-set, and the atomic increment.

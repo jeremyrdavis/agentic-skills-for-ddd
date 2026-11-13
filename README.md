@@ -1,184 +1,121 @@
 # Agentic Skills for DDD
 
-A curated set of domain-driven design (DDD) skills for working with AI coding assistants. This repository packages a small, opinionated playbook for modeling DDD systems with clear boundaries, explicit language, and consistent layering.
+A curated set of domain-driven design (DDD) skills for AI coding assistants. The set is an opinionated, stack-neutral playbook for modeling bounded contexts with clear boundaries, explicit language, and consistent layering. Each skill helps an assistant reason about one DDD concern without collapsing everything into generic CRUD, service blobs, or framework-first design.
 
-Each skill is written to help an assistant reason about a specific DDD concern without collapsing everything into generic CRUD, service blobs, or framework-first design. The goal is to make Claude and Codex better at staying inside the right layer, choosing the right abstractions, and avoiding the common traps that turn domain code into persistence-driven code.
+**Version:** `ddd-skills 1.0` (see `VERSION`). Core Rule numbering is frozen within a major version; stack skills cite rule numbers against it.
+
+## Two tiers: design here, mechanics in a stack skill
+
+These skills decide **what**: the layers, the shape of an aggregate, the repository contract, who owns the transaction, when an event is delivered. They are the same in every language and framework, and they stay static.
+
+**How** a particular framework realizes those decisions — the transaction annotation, the ORM mapping on the persistence mirror, the lock-conflict → 409 wiring, after-commit event delivery, the test tiers — lives in a separate **mechanics skill per stack**, named `<stack>-ddd`:
+
+| Stack | Skill | Where |
+| --- | --- | --- |
+| Quarkus | `quarkus-ddd` | [agentic-skills-for-quarkus](https://github.com/jeremyrdavis/agentic-skills-for-quarkus) |
+| Spring Boot | `spring-ddd` | planned |
+| Python stacks | `fastapi-ddd`, … | planned |
+
+Install the DDD skills plus the one stack skill your project uses. Every DDD skill points at `<stack>-ddd` with a soft reference: if it is installed the assistant loads it for the mechanics and the stack's worked example; if not, the DDD rules still apply and the assistant uses your framework's equivalents.
+
+A stack skill must not redefine any DDD concept. It supplies annotations, framework idioms, configuration, and worked examples that cite the DDD Core Rules by number — nothing else.
 
 ## What this repository contains
 
-- `ddd-foundations-skill` — the shared layering model and terminology used by all other skills.
-- `ddd-aggregates` — how to design aggregate roots, factories, rehydration, state transitions, and invariants.
-- `ddd-value-objects` — how to model immutable value objects, typed IDs, and value-based equality.
-- `ddd-services` — how to distinguish application services from domain services.
-- `ddd-persistence` — how repositories, persistence mirrors, locking, and query results should work.
+Six skills under `skills/`:
 
-## Purpose
+- `ddd-foundations` — the shared layering model (`domain` / `application` / `infrastructure` / `api`) and terminology every other skill references.
+- `ddd-aggregates` — aggregate roots: identity, named factories, `rehydrate(...)`, state transitions, invariants, cross-aggregate references by ID, the `version` field, raising domain events.
+- `ddd-value-objects` — immutable value objects, constructor validation and normalization, equality by value, typed ID wrappers.
+- `ddd-services` — application services (orchestrate, own the transaction, return DTOs) versus domain services (pure computation).
+- `ddd-persistence` — repository interfaces in `domain`, same-name implementations in `infrastructure`, the persistence mirror, optimistic locking, atomic operations, use-case-optimal queries.
+- `ddd-domain-events` — what an event is and carries, after-commit delivery, idempotent handlers, domain versus integration events.
 
-These skills are meant to help you and your AI assistant:
+Each skill is a `SKILL.md` with the same structure: a foundational principle, red flags, when to use, numbered Core Rules, anti-patterns, an excuse/reality table, a quick-reference checklist, and companion skills. The `ddd-aggregates` and `ddd-value-objects` skills also carry stack-neutral worked examples in `references/` (Java, Python, TypeScript). The framework-dependent worked examples (foundations, services, persistence, events) live in the stack skills; Python and TypeScript fallbacks remain here until their stack skills exist.
 
-- model DDD concepts in a consistent way across a codebase,
-- keep domain logic in the domain layer,
-- keep infrastructure and framework concerns out of domain types,
-- choose the right abstraction for each responsibility,
-- and review code changes against DDD-specific rules and anti-patterns.
+## Install
 
-If you are building or reviewing a bounded context, these skills give you a shared vocabulary and a set of enforceable rules for:
+There is no `claude mcp add-skill` command. Use one of the following.
 
-- module layout,
-- aggregate design,
-- value object construction,
-- service responsibilities,
-- repository boundaries,
-- and persistence translation.
+### Plugin, per project (recommended)
 
-## The individual skills
+Add the marketplace once, then install into each project that uses DDD. Project scope records the plugin in that project's `.claude/settings.json`, so nothing is loaded in projects that don't use it.
 
-### `ddd-foundations-skill`
-The foundation for the whole set. It defines the canonical DDD layers and where each kind of type belongs:
+```bash
+claude plugin marketplace add jeremyrdavis/agentic-skills-for-ddd
+cd <your-project>
+claude plugin install ddd-skills@agentic-skills-for-ddd --scope project
+```
 
-- `domain`
-- `application`
-- `infrastructure`
-- `api`
+One-step form from inside a Claude Code session:
 
-Use this skill when you are deciding where a type should live, how modules should depend on one another, or whether a class is a domain service, application service, repository interface, controller, or adapter.
+```
+/plugin install ddd-skills --marketplace jeremyrdavis/agentic-skills-for-ddd
+```
 
-### `ddd-aggregates`
-Use this skill when designing or modifying an aggregate root.
+Use `--scope local` for a personal, uncommitted install, and `--scope user` only if you want the skills in every project. For a Quarkus project, also install `quarkus-skills` from the Quarkus repository.
 
-It covers:
+### Copy, per project (no manifests)
 
-- aggregate identity strategy,
-- named factory methods,
-- `rehydrate(...)` for persistence reconstruction,
-- enforcing invariants during creation and transition,
-- referencing other aggregates by ID rather than object reference,
-- optimistic locking with a version field,
-- and domain events raised from inside the aggregate.
+```bash
+git clone https://github.com/jeremyrdavis/agentic-skills-for-ddd.git
+cp -r agentic-skills-for-ddd/skills/ddd-* <your-project>/.claude/skills/
+```
 
-### `ddd-value-objects`
-Use this skill when modeling values with no identity.
-
-It covers:
-
-- immutable value objects,
-- constructor-based validation,
-- normalization during construction,
-- equality by value,
-- typed ID wrappers like `OrderId` and `CustomerId`,
-- and behavior that lives directly on the value type.
-
-### `ddd-services`
-Use this skill when deciding whether something belongs in an application service, a domain service, or on the aggregate itself.
-
-It covers:
-
-- application service orchestration,
-- domain service computation,
-- transaction ownership,
-- event draining and dispatch after commit,
-- and naming conventions such as `*ApplicationService` and `*DomainService`.
-
-### `ddd-persistence`
-Use this skill when designing repositories and persistence behavior.
-
-It covers:
-
-- repository interfaces in the domain layer,
-- repository implementations in infrastructure,
-- translating between domain objects and persistence mirrors,
-- optimistic locking and conflict handling,
-- intention-revealing atomic database operations,
-- and use-case-optimal query results that return domain value objects rather than DTOs or ORM entities.
+Claude Code loads `<project>/.claude/skills/<name>/SKILL.md` for that project. Copy all six; the skills cross-reference each other.
 
 ## How the skills fit together
 
-A useful way to think about the set is:
-
-- `ddd-foundations-skill` tells you **where things belong**.
+- `ddd-foundations` tells you **where things belong**.
 - `ddd-value-objects` tells you **how to model values**.
 - `ddd-aggregates` tells you **how to model consistency boundaries**.
 - `ddd-services` tells you **how to orchestrate use cases and domain computation**.
 - `ddd-persistence` tells you **how to cross the storage boundary safely**.
+- `ddd-domain-events` tells you **how facts leave an aggregate and reach a handler**.
+- `<stack>-ddd` tells you **how your framework does each of those**.
 
-In practice, you often use them together. For example:
+For a new `Order` aggregate: the aggregate uses `ddd-aggregates`; its `OrderId` and `Money` use `ddd-value-objects`; the use case uses `ddd-services`; the repository uses `ddd-persistence`; `OrderPlacedEvent` uses `ddd-domain-events`; the package layout comes from `ddd-foundations`; and the `@Transactional`, Panache mirror, and Kafka outbox come from `quarkus-ddd`.
 
-- A new `Order` aggregate uses `ddd-aggregates`.
-- Its `OrderId` and `Money` types use `ddd-value-objects`.
-- The use case that creates or updates it uses `ddd-services`.
-- The repository that saves it uses `ddd-persistence`.
-- The module structure that keeps all of those in the right place comes from `ddd-foundations-skill`.
+## Using the skills with Claude Code
 
-## How to leverage these skills with Claude
+Once installed, the skills fire on their own: each `SKILL.md` has a description listing the situations and code smells it triggers on, and Claude loads the body only when it matches. You don't need to paste skill content into the conversation. Ask in terms of the DDD concern:
 
-Claude works best when you give it the skill content explicitly and ask it to apply the rules while generating or reviewing code.
+- "Design the module layout for an orders bounded context."
+- "Model `EmailAddress` and `Money` as value objects."
+- "Refactor this use case so the transaction stays in the application service and the repository only translates."
+- "Review this diff against the DDD skills and flag any boundary violations."
 
-Recommended approach:
+Asking for the skill's checklist and anti-patterns, not just code, keeps the output aligned with the architecture.
 
-1. Open the relevant `SKILL.md` file for the task.
-2. Paste the skill content into Claude or reference the skill directly if your Claude environment supports skills.
-3. Ask Claude to follow the skill’s rules while designing, reviewing, or refactoring code.
-4. If the task touches multiple concerns, combine the relevant skills.
+## Using the skills with Codex
 
-Example prompts:
-
-- “Use the DDD Foundations and Aggregates skills to design the module layout for this bounded context.”
-- “Apply the Value Objects skill to model `EmailAddress` and `Money`.”
-- “Use the Services and Persistence skills to refactor this use case so the transaction stays in the application service and the repository only translates data.”
-- “Review this diff against the DDD skills and flag any boundary violations.”
-
-Best practice: ask Claude to reason in terms of the skill’s checklist and anti-patterns, not just to generate code. That keeps the output aligned with the intended architecture.
-
-## How to leverage these skills with Codex
-
-Codex can use the same skill files as architectural guidance while it generates or modifies code.
-
-Recommended approach:
-
-1. Provide Codex with the relevant skill file or point it at this repository.
-2. State the task in terms of the DDD concern you want to change.
-3. Ask Codex to consult the skill before making changes.
-4. For larger tasks, ask it to use multiple skills in sequence.
-
-Example prompts:
-
-- “Use `ddd-foundations-skill` and `ddd-services` to place these classes in the right modules.”
-- “Use `ddd-aggregates` and `ddd-value-objects` to model this order workflow correctly.”
-- “Use `ddd-persistence` to implement repository translation without leaking ORM entities outside infrastructure.”
-- “Refactor this code to obey the DDD skills, then summarize the boundary changes you made.”
-
-If you are using Codex in an agentic workflow, it helps to ask for a plan first and then request implementation. That makes it easier to validate that the right skill is being applied to the right layer before code is written.
-
-## Practical workflow
-
-A simple way to use the repository is:
-
-1. Identify the DDD concern in your task.
-2. Open the matching skill file.
-3. Share that skill with Claude or Codex.
-4. Ask for a design, review, or refactor aligned with the skill.
-5. Validate the result against the skill’s quick-reference checklist.
+Codex can use the same files as architectural guidance. Point it at the repository or copy the relevant `skills/ddd-*/SKILL.md` into its context, state the task in terms of the DDD concern, and ask it to consult the skill before changing code. For larger tasks, ask for a plan first; it is easier to check that the right skill is applied to the right layer before code is written.
 
 ## Repository structure
 
 ```text
 .
-├── ddd-aggregates/
-├── ddd-foundations-skill/
-├── ddd-persistence/
-├── ddd-services/
-└── ddd-value-objects/
+├── .claude-plugin/
+│   ├── plugin.json
+│   └── marketplace.json
+├── VERSION
+└── skills/
+    ├── ddd-aggregates/
+    │   ├── SKILL.md
+    │   └── references/            (Java, Python, TypeScript — stack-neutral)
+    ├── ddd-domain-events/
+    ├── ddd-foundations/
+    │   └── references/            (Python, TypeScript fallbacks)
+    ├── ddd-persistence/
+    │   └── references/            (Python, TypeScript fallbacks)
+    ├── ddd-services/
+    │   └── references/            (Python, TypeScript fallbacks)
+    └── ddd-value-objects/
+        └── references/            (Java, Python, TypeScript — stack-neutral)
 ```
 
 ## Contributing
 
-If you add a new DDD concern, keep the format consistent with the existing skills:
+A new DDD concern follows the existing template: purpose statement, red flags, when-to-use, numbered Core Rules, anti-patterns, excuse/reality, quick reference, companion skills. Keep `SKILL.md` stack-neutral; framework code belongs in a `<stack>-ddd` skill. Adding a rule appends to the list — numbering is frozen within a major version because stack skills cite it.
 
-- clear purpose statement,
-- when-to-use guidance,
-- core rules,
-- anti-patterns,
-- quick reference,
-- and companion skills.
-
-That consistency is what makes the collection useful to both humans and AI assistants.
+A new stack skill is named `<stack>-ddd`, defers every design decision to these skills, and carries `references/{foundations,services,persistence,domain-events}.md` plus whatever cross-cutting setup the stack needs. See `quarkus-ddd` for the shape.

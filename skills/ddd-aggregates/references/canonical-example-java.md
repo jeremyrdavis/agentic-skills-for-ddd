@@ -66,7 +66,7 @@ public class Order {
      * Reconstruction path for the persistence layer (Rule 6). Trusts inputs that
      * already passed validation when first persisted; does NOT re-emit
      * OrderPlacedEvent. Only the repository implementation in
-     * <bc>/infrastructure calls this (covered by ddd-repositories).
+     * <bc>/infrastructure calls this (covered by ddd-persistence).
      */
     public static Order rehydrate(UUID id, CustomerId customerId, List<OrderLine> lines,
                                   Status status, Money total, long version) {
@@ -135,7 +135,7 @@ public record OrderFulfilledEvent(OrderId orderId)                      implemen
 ## The persistence mirror (lives in `<bc>/infrastructure`)
 
 The aggregate has no idea this class exists. Sketch only — full coverage in
-`ddd-repositories`:
+`ddd-persistence`:
 
 ```java
 // com.example.orders.infrastructure

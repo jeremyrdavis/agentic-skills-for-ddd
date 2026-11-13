@@ -109,7 +109,7 @@ Usage in an aggregate is a plain field — `self._total: Money`,
 ## The persistence mirror (lives in `<bc>/infrastructure`)
 
 The domain dataclasses know nothing about persistence. Sketch only — full
-mapping rules in `ddd-repositories`. Flat columns on the SQLAlchemy mirror; the
+mapping rules in `ddd-persistence`. Flat columns on the SQLAlchemy mirror; the
 repository assembles the value objects:
 
 ```python

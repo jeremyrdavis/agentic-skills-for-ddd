@@ -1,0 +1,14 @@
+{
+  "name": "agentic-skills-for-ddd",
+  "description": "Stack-neutral Domain-Driven Design skills for Claude Code; pair with a <stack>-ddd mechanics plugin such as quarkus-skills.",
+  "owner": {
+    "name": "jeremyrdavis"
+  },
+  "plugins": [
+    {
+      "name": "ddd-skills",
+      "source": "./",
+      "description": "Stack-neutral Domain-Driven Design skills: layering, aggregates, value objects, services, persistence, domain events."
+    }
+  ]
+}

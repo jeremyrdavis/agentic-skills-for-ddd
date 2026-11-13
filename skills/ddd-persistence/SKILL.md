@@ -34,7 +34,7 @@ If any of these surface, re-read Core Rules and Excuse / Reality before typing.
 - Adding an atomic in-database operation (counter increment, bulk status flip).
 - Reviewing a diff where persistence types, sessions, or DTOs cross a repository interface, where a repository owns a transaction, or where an application service contains raw SQL/ORM calls.
 
-**Out of scope**: where the interface and implementation live (`ddd-foundations` Rules 7–8 — assumed here); the aggregate's own shape, its `version` field, and the `rehydrate(...)` contract's *existence* (`ddd-aggregates` — this skill governs the *calling* side); transaction ownership and the load-compute-mutate-persist orchestration (`ddd-services`); event dispatch (`ddd-domain-events`); migration-tool and ORM mechanics (the per-stack persistence skill).
+**Out of scope**: where the interface and implementation live (`ddd-foundations` Rules 7–8 — assumed here); the aggregate's own shape, its `version` field, and the `rehydrate(...)` contract's *existence* (`ddd-aggregates` — this skill governs the *calling* side); transaction ownership and the load-compute-mutate-persist orchestration (`ddd-services`); event dispatch (`ddd-domain-events`); ORM mapping and the lock-conflict → 409 wiring for a specific framework (`<stack>-ddd`).
 
 ---
 
@@ -52,9 +52,8 @@ If any of these surface, re-read Core Rules and Excuse / Reality before typing.
 10. **Pagination is a use-case-optimal query.** Page/size arrive as plain parameters; the result is a purpose-built VO carrying the items and the total count (`OrderPage(items, totalCount, page, size)`). The repository does not leak the framework's pagination object.
 11. **No generic `Repository<T>`.** A shared base class flattens every aggregate to the same CRUD surface, invites methods no aggregate asked for, and turns the interface from a domain contract into a framework echo. Each repository earns its methods from its aggregate's use cases.
 12. **No transactions inside repositories.** The application service owns the boundary (per `ddd-services` Rule 8); a repository method runs inside whatever transaction its caller opened.
-13. **Schema evolves by versioned migrations.** The migration tool and workflow are per-stack; the requirement is family-wide.
 
-For the worked example — interface, same-name implementation, mirror, locking, an atomic operation, and a Vernon use-case-optimal paged query — read the reference file matching the working language: `references/canonical-example-java.md`, `references/canonical-example-python.md`, or `references/canonical-example-typescript.md`. Load exactly one, and only when implementing a repository or adding a non-trivial query; the rules and tables in this file are sufficient for placement and review decisions. If the working language has no file, read the closest listed one and adapt the idioms — the persistence contract is identical in every language.
+For the worked example — interface, same-name implementation, mirror, locking, an atomic operation, and a Vernon use-case-optimal paged query — read `references/persistence.md` in the `<stack>-ddd` skill for your stack (e.g. `quarkus-ddd`). Until a stack skill exists for your language, `references/canonical-example-python.md` and `references/canonical-example-typescript.md` here are stack-neutral fallbacks. Load exactly one, and only when implementing a repository or adding a non-trivial query; the rules and tables in this file are sufficient for placement and review decisions. If neither is available, apply the rules with your framework's equivalents — the persistence contract is identical in every stack.
 
 ---
 
@@ -125,4 +124,4 @@ When you commit a repository interface, every line below should be true:
 - **`ddd-value-objects`** — the shape rules for typed IDs and for the purpose-built query VOs of Rule 9 (immutable, constructor-validated, equality by value).
 - **`ddd-services`** — the application service that owns the transaction the repository runs inside, and the load-mutate-persist orchestration.
 - **`ddd-domain-events`** — the after-commit delivery that cross-aggregate consistency relies on instead of multi-aggregate saves.
-- **Per-stack mechanics skills** (`quarkus-*`, `fastapi-*`, `express-*`, or your stack's equivalents) — migration tooling, session/connection management, and ORM specifics.
+- **`<stack>-ddd`** — the mechanics skill for your stack (`quarkus-ddd`, `spring-ddd`, `fastapi-ddd`, ...), if installed: ORM mapping on the mirror, session/connection management, the lock-conflict → 409 wiring, plus the worked example for this skill (`references/persistence.md` there). If none is installed, apply the rules above with your framework's equivalents.

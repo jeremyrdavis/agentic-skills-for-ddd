@@ -108,7 +108,7 @@ Usage in an aggregate is a plain field — `private Money total;`,
 ## The persistence mirror (lives in `<bc>/infrastructure`)
 
 The domain records know nothing about persistence. Sketch only — full mapping
-rules in `ddd-repositories`. Two equally valid shapes; the repository's call:
+rules in `ddd-persistence`. Two equally valid shapes; the repository's call:
 
 ```java
 // Option A: an embeddable mirror record (Hibernate ORM 6+ maps records natively)

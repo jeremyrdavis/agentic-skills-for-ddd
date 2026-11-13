@@ -132,7 +132,7 @@ Usage in an aggregate is a plain field — `private _total: Money`,
 ## The persistence mirror (lives in `<bc>/infrastructure`)
 
 The domain classes know nothing about persistence. Sketch only — full mapping
-rules in `ddd-repositories`. Flat columns in the Prisma model; the repository
+rules in `ddd-persistence`. Flat columns in the Prisma model; the repository
 assembles the value objects from the generated row type:
 
 ```prisma

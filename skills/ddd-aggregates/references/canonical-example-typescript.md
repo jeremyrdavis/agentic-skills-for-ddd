@@ -65,7 +65,7 @@ export class Order {
    * Reconstruction path for the persistence layer (Rule 6). Trusts inputs that
    * already passed validation when first persisted; does NOT re-emit
    * OrderPlacedEvent. Only the repository implementation in
-   * <bc>/infrastructure calls this (covered by ddd-repositories).
+   * <bc>/infrastructure calls this (covered by ddd-persistence).
    */
   static rehydrate(id: string, customerId: CustomerId, lines: OrderLine[],
                    status: OrderStatus, total: Money, version: number): Order {
@@ -153,7 +153,7 @@ export class OrderFulfilledEvent implements DomainEvent {
 ## The persistence mirror (lives in `<bc>/infrastructure`)
 
 The aggregate has no idea this schema exists. Sketch only — full coverage in
-`ddd-repositories`:
+`ddd-persistence`:
 
 ```prisma
 // prisma/schema.prisma — the conventional location; `prisma generate` makes the client
