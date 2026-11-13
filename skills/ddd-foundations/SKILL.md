@@ -102,7 +102,7 @@ When you catch yourself reasoning around the rules above, look here before you t
 | Repository **implementation** (ORM, SQL, HTTP-backed) | `<bc>/infrastructure` |
 | External-system adapter (HTTP client, message producer/consumer, LLM client) | `<bc>/infrastructure` |
 | HTTP resource / controller / route handler | `<bc>/api` |
-| Error mapper / exception handler | `<bc>/api` |
+| Error mapper / exception handler | `<bc>/api` — the one api type that may name domain exception types, to map them to status codes |
 
 ### Type name → suffix
 

@@ -14,6 +14,7 @@ rule numbers.
 # orders/domain/order.py
 from __future__ import annotations
 
+from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
@@ -46,18 +47,19 @@ class Order:
     """
 
     def __init__(self, id: UUID, customer_id: CustomerId, lines: list[OrderLine],
-                 status: OrderStatus, total: Money, version: int) -> None:
+                 status: OrderStatus, total: Money, placed_at: datetime, version: int) -> None:
         self._id = id                          # identity (Rule 9)
         self._version = version                # optimistic-lock cursor (Rule 10) — plain int
         self._customer_id = customer_id        # reference by ID, not object (Rules 8, 9)
         self._lines = list(lines)
         self._status = status
         self._total = total                    # value object as a plain field (Rule 11)
+        self._placed_at = placed_at            # the clock is passed in by the use case, never read here
         self._pending_events: list[DomainEvent] = []
 
     @classmethod
     def place(cls, id: OrderId, customer_id: CustomerId,
-              lines: list[OrderLine]) -> "Order":
+              lines: list[OrderLine], placed_at: datetime) -> "Order":
         """Named factory — enforces creation invariants (Rule 5) and raises
         OrderPlacedEvent (Rule 12)."""
         if not lines:
@@ -69,18 +71,18 @@ class Order:
         total = sum((line.line_total() for line in lines),
                     start=Money.zero(currency))
 
-        order = cls(id.value, customer_id, lines, OrderStatus.PLACED, total, 0)
+        order = cls(id.value, customer_id, lines, OrderStatus.PLACED, total, placed_at, 0)
         order._pending_events.append(OrderPlacedEvent(id, customer_id))  # Rule 12
         return order
 
     @classmethod
     def rehydrate(cls, id: UUID, customer_id: CustomerId, lines: list[OrderLine],
-                  status: OrderStatus, total: Money, version: int) -> "Order":
+                  status: OrderStatus, total: Money, placed_at: datetime, version: int) -> "Order":
         """Reconstruction path for the persistence layer (Rule 6). Trusts inputs
         that already passed validation when first persisted; does NOT re-emit
         OrderPlacedEvent. Only the repository implementation in
         <bc>/infrastructure calls this (covered by ddd-persistence)."""
-        return cls(id, customer_id, lines, status, total, version)
+        return cls(id, customer_id, lines, status, total, placed_at, version)
 
     def cancel(self) -> None:
         """Transition method — enforces the state-machine invariant (Rule 7)."""
@@ -106,6 +108,8 @@ class Order:
     def customer_id(self) -> CustomerId: return self._customer_id
     @property
     def lines(self) -> tuple[OrderLine, ...]: return tuple(self._lines)  # defensive copy
+    @property
+    def placed_at(self) -> datetime: return self._placed_at
     @property
     def version(self) -> int: return self._version
 
@@ -202,6 +206,7 @@ class OrderModel(Base):
     status: Mapped[str]
     total_amount: Mapped[Decimal]     # Money split into columns — repository's call
     total_currency: Mapped[str]
+    placed_at: Mapped[datetime]
     # lines: relationship to OrderLineModel
 
     @staticmethod
@@ -210,7 +215,7 @@ class OrderModel(Base):
         return Order.rehydrate(self.id, CustomerId(self.customer_id),
                                self._map_lines(), OrderStatus(self.status),
                                Money(self.total_amount, self.total_currency),
-                               self.version)
+                               self.placed_at, self.version)
 ```
 
 **Optimistic locking mechanics:** SQLAlchemy's `version_id_col` raises

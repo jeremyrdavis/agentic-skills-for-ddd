@@ -37,13 +37,14 @@ export class Order {
     private readonly _lines: OrderLine[],
     private _status: OrderStatus,
     private _total: Money,                     // value object as a plain field (Rule 11)
+    private readonly _placedAt: Date,          // the clock is passed in by the use case, never read here
   ) {}
 
   /**
    * Named factory — the only way domain code brings a new Order into existence.
    * Enforces creation invariants (Rule 5) and raises OrderPlacedEvent (Rule 12).
    */
-  static place(id: OrderId, customerId: CustomerId, lines: OrderLine[]): Order {
+  static place(id: OrderId, customerId: CustomerId, lines: OrderLine[], placedAt: Date): Order {
     if (lines.length === 0) {
       throw new Error("an order must have at least one line");
     }
@@ -56,7 +57,7 @@ export class Order {
       .map((l) => l.lineTotal())
       .reduce((sum, t) => sum.plus(t), Money.zero(currency));
 
-    const order = new Order(id.value, 0, customerId, [...lines], "PLACED", total);
+    const order = new Order(id.value, 0, customerId, [...lines], "PLACED", total, placedAt);
     order.pendingEvents.push(new OrderPlacedEvent(id, customerId)); // Rule 12
     return order;
   }
@@ -68,8 +69,8 @@ export class Order {
    * <bc>/infrastructure calls this (covered by ddd-persistence).
    */
   static rehydrate(id: string, customerId: CustomerId, lines: OrderLine[],
-                   status: OrderStatus, total: Money, version: number): Order {
-    return new Order(id, version, customerId, [...lines], status, total);
+                   status: OrderStatus, total: Money, placedAt: Date, version: number): Order {
+    return new Order(id, version, customerId, [...lines], status, total, placedAt);
   }
 
   /** Transition method — enforces the state-machine invariant (Rule 7). */
@@ -95,6 +96,7 @@ export class Order {
   get total(): Money { return this._total; }
   get customerId(): CustomerId { return this._customerId; }
   get lines(): readonly OrderLine[] { return [...this._lines]; }  // defensive copy
+  get placedAt(): Date { return this._placedAt; }
   get version(): number { return this._version; }
 
   /** Drained by the application service after persist; published after commit (Rule 12). */
@@ -175,6 +177,7 @@ model Order {
   status        String
   totalAmount   Decimal @map("total_amount")    // Money split into columns — repository's call
   totalCurrency String  @map("total_currency")
+  placedAt      DateTime @map("placed_at")
 
   @@map("orders")
 }
@@ -187,7 +190,7 @@ import type { Order as OrderRow } from "@prisma/client";
 export function toDomain(row: OrderRow, lines: OrderLine[]): Order {
   return Order.rehydrate(row.id, new CustomerId(row.customerId), lines,
     row.status as OrderStatus,
-    new Money(Number(row.totalAmount), row.totalCurrency), row.version);
+    new Money(Number(row.totalAmount), row.totalCurrency), row.placedAt, row.version);
 }
 ```
 
